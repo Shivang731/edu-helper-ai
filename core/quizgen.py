@@ -18,6 +18,7 @@ from transformers import pipeline
 # Ensure NLTK resources are present once per session
 nltk.download("punkt", quiet=True)
 nltk.download("averaged_perceptron_tagger", quiet=True)
+nltk.download("words", quiet=True)
 
 _qa_model = pipeline("question-generation")
 

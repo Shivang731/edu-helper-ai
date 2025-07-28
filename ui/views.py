@@ -55,12 +55,12 @@ def render_flashcards_view(cards: List[Dict[str, str]], current: int = 0) -> Non
         st.success(f"**Answer:** {card['answer']}")
         if st.button("Show question"):
             st.session_state[flip_key] = False
-            st.experimental_rerun()
+            st.rerun()
     else:
         st.info(f"**Question:** {card['question']}")
         if st.button("Show answer"):
             st.session_state[flip_key] = True
-            st.experimental_rerun()
+            st.rerun()
 
 
 # ────────────────────────────────────────────────────────────
