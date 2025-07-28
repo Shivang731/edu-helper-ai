@@ -1,0 +1,54 @@
+# Core web framework
+streamlit>=1.28.0
+
+# PDF and text processing
+PyPDF2>=3.0.1
+pypdf>=3.17.0
+python-docx>=0.8.11
+
+# AI/ML libraries
+transformers>=4.33.0
+torch>=2.0.0
+sentence-transformers>=2.2.2
+huggingface-hub>=0.16.4
+
+# Vector search and embeddings
+faiss-cpu>=1.7.4
+numpy>=1.24.0
+
+# Text-to-speech
+gTTS>=2.3.2
+pydub>=0.25.1
+
+# Natural language processing
+spacy>=3.6.0
+nltk>=3.8.1
+
+# Database and storage
+sqlalchemy>=2.0.0
+sqlite3
+
+# Web scraping and utilities
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# Data handling
+pandas>=2.0.0
+python-dateutil>=2.8.2
+
+# Export functionality  
+markdown>=3.4.4
+jinja2>=3.1.2
+weasyprint>=59.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.7.0
+flake8>=6.0.0
+
+# Additional utilities
+pathlib
+typing-extensions>=4.7.0
+python-dotenv>=1.0.0
+tqdm>=4.65.0
