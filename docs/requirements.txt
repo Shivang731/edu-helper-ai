@@ -1,0 +1,20 @@
+
+## UI/UX
+- **Gradient header** with fixed top menu for About & Connect  
+- **Dark modern theme** with custom fonts and box shadows  
+- **Responsive layout**: sidebar controls & main content panels  
+- **About & Connect** at top-right for quick info
+
+## Data Flow
+1. User uploads doc  
+2. Text extraction & cleaning  
+3. AI summarization  
+4. Flashcard & audio generation  
+5. Semantic search indexing  
+6. Optional export to Markdown
+
+## Future Enhancements
+- Light/Dark toggle  
+- Theming & accessibility improvements  
+- Collaborative annotations  
+- Mobile PWA support  
