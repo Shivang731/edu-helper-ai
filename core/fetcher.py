@@ -1,102 +1,72 @@
-import PyPDF2
 import io
 from typing import Optional
-import streamlit as st
 
-def extract_text_from_pdf(uploaded_file) -> str:
-    """
-    Extract text from uploaded PDF file.
-    
-    Args:
-        uploaded_file: Streamlit uploaded file object
-        
-    Returns:
-        str: Extracted text from PDF
-    """
+def extract_text_from_pdf(file) -> str:
+    """Extract text from PDF file."""
     try:
-        # Create a BytesIO object from the uploaded file
-        pdf_bytes = io.BytesIO(uploaded_file.getvalue())
+        import PyPDF2
         
-        # Create PDF reader object
-        pdf_reader = PyPDF2.PdfReader(pdf_bytes)
+        # Reset file pointer if needed
+        if hasattr(file, 'seek'):
+            file.seek(0)
         
-        # Extract text from all pages
+        pdf_reader = PyPDF2.PdfReader(file)
         text = ""
-        for page_num in range(len(pdf_reader.pages)):
-            page = pdf_reader.pages[page_num]
-            text += page.extract_text() + "\n\n"
+        
+        for page_num, page in enumerate(pdf_reader.pages):
+            try:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+            except Exception as e:
+                print(f"Error extracting page {page_num}: {str(e)}")
+                continue
         
         if not text.strip():
-            return "Error: No text could be extracted from the PDF. The file might be image-based or encrypted."
+            return "Error: No text could be extracted from the PDF file."
         
-        return text.strip()
+        return text
         
+    except ImportError:
+        return "Error: PyPDF2 library not found. Please install it to extract PDF text."
     except Exception as e:
         return f"Error extracting PDF: {str(e)}"
 
-def extract_text_from_txt(uploaded_file) -> str:
-    """
-    Extract text from uploaded TXT file.
-    
-    Args:
-        uploaded_file: Streamlit uploaded file object
-        
-    Returns:
-        str: Text content from file
-    """
+def extract_text_from_txt(file) -> str:
+    """Extract text from TXT file."""
     try:
-        # Read the text file content
-        text = uploaded_file.getvalue().decode('utf-8')
+        # Reset file pointer if needed
+        if hasattr(file, 'seek'):
+            file.seek(0)
+        
+        # Try to read as string first, then as bytes
+        if hasattr(file, 'getvalue'):
+            content = file.getvalue()
+            if isinstance(content, bytes):
+                text = content.decode('utf-8')
+            else:
+                text = content
+        else:
+            content = file.read()
+            if isinstance(content, bytes):
+                text = content.decode('utf-8')
+            else:
+                text = content
         
         if not text.strip():
             return "Error: The text file appears to be empty."
         
-        return text.strip()
+        return text
         
     except UnicodeDecodeError:
         try:
             # Try different encodings
-            text = uploaded_file.getvalue().decode('latin-1')
-            return text.strip()
+            if hasattr(file, 'seek'):
+                file.seek(0)
+            content = file.read()
+            text = content.decode('latin-1')
+            return text
         except Exception as e:
             return f"Error: Could not decode text file. {str(e)}"
     except Exception as e:
-        return f"Error extracting text: {str(e)}"
-
-def get_file_stats(uploaded_file) -> dict:
-    """
-    Get statistics about the uploaded file.
-    
-    Args:
-        uploaded_file: Streamlit uploaded file object
-        
-    Returns:
-        dict: File statistics
-    """
-    try:
-        file_size = len(uploaded_file.getvalue())
-        file_type = uploaded_file.type
-        file_name = uploaded_file.name
-        
-        # Convert file size to human readable format
-        if file_size < 1024:
-            size_str = f"{file_size} bytes"
-        elif file_size < 1024 * 1024:
-            size_str = f"{file_size / 1024:.2f} KB"
-        else:
-            size_str = f"{file_size / (1024 * 1024):.2f} MB"
-        
-        return {
-            'name': file_name,
-            'size': file_size,
-            'size_str': size_str,
-            'type': file_type
-        }
-    except Exception as e:
-        return {
-            'name': 'Unknown',
-            'size': 0,
-            'size_str': '0 bytes',
-            'type': 'Unknown',
-            'error': str(e)
-        }
+        return f"Error extracting TXT: {str(e)}"
