@@ -5,8 +5,8 @@ This module handles the cleaning, structuring, and preprocessing of text
 extracted from study materials. It makes raw document text ready for
 AI analysis, summarization, and flashcard generation.
 
-Author: [Your Name]
-Created for: College Scholarship Application
+Author: Shivang 
+
 """
 
 import re
