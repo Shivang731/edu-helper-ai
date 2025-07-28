@@ -26,7 +26,6 @@ nltk>=3.8.1
 
 # Database and storage
 sqlalchemy>=2.0.0
-sqlite3
 
 # Web scraping and utilities
 requests>=2.31.0
