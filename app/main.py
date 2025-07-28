@@ -316,4 +316,5 @@ def render_features_section():
         </div>
         
         <div class="feature-card">
-            <div
+        </div>
+        """, height=400)
