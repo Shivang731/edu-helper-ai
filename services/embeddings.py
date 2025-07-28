@@ -1,211 +1,95 @@
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
-from typing import List, Dict, Optional, Tuple
-import pickle
-import os
+import re
+from typing import List, Dict
 
 class SemanticSearchService:
-    """Semantic search service using sentence transformers and FAISS."""
-    
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        self.model_name = model_name
-        self.model = None
+    def __init__(self):
         self.index = None
-        self.documents = []
+        self.text_chunks = []
         self.embeddings = None
-        self.is_initialized = False
-        
-    def _initialize_model(self):
-        """Initialize the sentence transformer model."""
-        if self.model is None:
-            try:
-                self.model = SentenceTransformer(self.model_name)
-                self.is_initialized = True
-            except Exception as e:
-                print(f"Error loading sentence transformer model: {e}")
-                self.is_initialized = False
     
-    def chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
-        """Split text into overlapping chunks for better search results."""
-        words = text.split()
-        chunks = []
+    def setup_index(self, text: str):
+        """Setup search index from text."""
+        if not text:
+            self.text_chunks = []
+            return
         
-        if len(words) <= chunk_size:
-            return [text]
-        
-        for i in range(0, len(words), chunk_size - overlap):
-            chunk = ' '.join(words[i:i + chunk_size])
-            chunks.append(chunk)
-            
-            # Break if we've reached the end
-            if i + chunk_size >= len(words):
-                break
-        
-        return chunks
-    
-    def setup_index(self, text: str) -> bool:
-        """
-        Set up the FAISS index with document chunks.
-        
-        Args:
-            text (str): Document text to index
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        self._initialize_model()
-        
-        if not self.is_initialized:
-            return False
+        # Split text into sentences for better search granularity
+        sentences = re.split(r'[.!?]+', text)
+        self.text_chunks = [s.strip() + '.' for s in sentences if len(s.strip()) > 20]
         
         try:
-            # Split text into chunks
-            self.documents = self.chunk_text(text)
+            # Try to use sentence transformers if available
+            self._setup_semantic_index()
+        except ImportError:
+            # Fallback to keyword-based search
+            print("Using keyword-based search (sentence-transformers not available)")
+    
+    def _setup_semantic_index(self):
+        """Setup semantic search using sentence transformers."""
+        try:
+            from sentence_transformers import SentenceTransformer
+            import numpy as np
             
-            if not self.documents:
-                return False
+            # Load model
+            model = SentenceTransformer('all-MiniLM-L6-v2')
             
             # Generate embeddings
-            self.embeddings = self.model.encode(self.documents)
+            self.embeddings = model.encode(self.text_chunks)
+            self.model = model
             
-            # Create FAISS index
-            dimension = self.embeddings.shape[1]
-            self.index = faiss.IndexFlatIP(dimension)  # Inner product for cosine similarity
-            
-            # Normalize embeddings for cosine similarity
-            faiss.normalize_L2(self.embeddings)
-            
-            # Add embeddings to index
-            self.index.add(self.embeddings.astype('float32'))
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error setting up search index: {e}")
-            return False
+        except ImportError:
+            raise ImportError("sentence-transformers not available")
     
-    def search(self, query: str, top_k: int = 5) -> List[Dict[str, any]]:
-        """
-        Search for relevant text chunks.
-        
-        Args:
-            query (str): Search query
-            top_k (int): Number of results to return
-            
-        Returns:
-            List[Dict]: Search results with scores and text
-        """
-        if not self.is_initialized or self.index is None or not self.documents:
+    def search(self, query: str, top_k: int = 5) -> List[str]:
+        """Search for relevant text chunks."""
+        if not self.text_chunks:
             return []
         
+        if self.embeddings is not None:
+            return self._semantic_search(query, top_k)
+        else:
+            return self._keyword_search(query, top_k)
+    
+    def _semantic_search(self, query: str, top_k: int) -> List[str]:
+        """Perform semantic search using embeddings."""
         try:
+            import numpy as np
+            from sklearn.metrics.pairwise import cosine_similarity
+            
             # Encode query
             query_embedding = self.model.encode([query])
-            faiss.normalize_L2(query_embedding)
             
-            # Search
-            scores, indices = self.index.search(query_embedding.astype('float32'), top_k)
+            # Calculate similarities
+            similarities = cosine_similarity(query_embedding, self.embeddings)[0]
+            
+            # Get top results
+            top_indices = np.argsort(similarities)[::-1][:top_k]
             
             results = []
-            for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
-                if idx < len(self.documents):
-                    result = {
-                        'rank': i + 1,
-                        'text': self.documents[idx],
-                        'score': float(score),
-                        'relevance': 'High' if score > 0.7 else 'Medium' if score > 0.5 else 'Low'
-                    }
-                    results.append(result)
+            for idx in top_indices:
+                if similarities[idx] > 0.1:  # Minimum similarity threshold
+                    results.append(self.text_chunks[idx])
             
             return results
             
         except Exception as e:
-            print(f"Error during search: {e}")
-            return []
+            print(f"Error in semantic search: {str(e)}")
+            return self._keyword_search(query, top_k)
     
-    def get_similar_chunks(self, text_chunk: str, top_k: int = 3) -> List[str]:
-        """Find similar chunks to a given text chunk."""
-        if not self.is_initialized or self.index is None:
-            return []
+    def _keyword_search(self, query: str, top_k: int) -> List[str]:
+        """Fallback keyword-based search."""
+        query_words = set(query.lower().split())
+        results = []
         
-        try:
-            chunk_embedding = self.model.encode([text_chunk])
-            faiss.normalize_L2(chunk_embedding)
+        for chunk in self.text_chunks:
+            chunk_words = set(chunk.lower().split())
             
-            scores, indices = self.index.search(chunk_embedding.astype('float32'), top_k + 1)
+            # Calculate word overlap
+            overlap = len(query_words.intersection(chunk_words))
             
-            similar_chunks = []
-            for score, idx in zip(scores[0], indices[0]):
-                if idx < len(self.documents) and self.documents[idx] != text_chunk:
-                    similar_chunks.append(self.documents[idx])
-            
-            return similar_chunks[:top_k]
-            
-        except Exception as e:
-            print(f"Error finding similar chunks: {e}")
-            return []
-    
-    def save_index(self, filepath: str) -> bool:
-        """Save the search index to disk."""
-        if not self.index or not self.documents:
-            return False
+            if overlap > 0:
+                results.append((chunk, overlap))
         
-        try:
-            # Save FAISS index
-            faiss.write_index(self.index, f"{filepath}.faiss")
-            
-            # Save documents and metadata
-            with open(f"{filepath}.pkl", 'wb') as f:
-                pickle.dump({
-                    'documents': self.documents,
-                    'model_name': self.model_name,
-                    'embeddings': self.embeddings
-                }, f)
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error saving index: {e}")
-            return False
-    
-    def load_index(self, filepath: str) -> bool:
-        """Load a search index from disk."""
-        try:
-            # Load FAISS index
-            self.index = faiss.read_index(f"{filepath}.faiss")
-            
-            # Load documents and metadata
-            with open(f"{filepath}.pkl", 'rb') as f:
-                data = pickle.load(f)
-                self.documents = data['documents']
-                self.embeddings = data['embeddings']
-                
-                # Initialize model if different
-                if data['model_name'] != self.model_name:
-                    self.model_name = data['model_name']
-                    self.model = None
-                
-                self._initialize_model()
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error loading index: {e}")
-            return False
-    
-    def get_document_stats(self) -> Dict[str, any]:
-        """Get statistics about the indexed documents."""
-        if not self.documents:
-            return {}
-        
-        total_words = sum(len(doc.split()) for doc in self.documents)
-        avg_chunk_length = total_words / len(self.documents)
-        
-        return {
-            'num_chunks': len(self.documents),
-            'total_words': total_words,
-            'avg_chunk_length': round(avg_chunk_length, 1),
-            'model_name': self.model_name,
-            'index_type': 'FAISS Inner Product' if self.index else 'Not initialized'
-        }
+        # Sort by overlap and return top results
+        results.sort(key=lambda x: x[1], reverse=True)
+        return [result[0] for result in results[:top_k]]
