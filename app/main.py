@@ -316,5 +316,221 @@ def render_features_section():
         </div>
         
         <div class="feature-card">
+            <div class="feature-icon">🔊</div>
+            <h3 class="feature-title">Audio Notes</h3>
+            <p class="feature-description">Listen to your notes anytime, anywhere. Perfect for learning on the go.</p>
         </div>
-        """, height=400)
+        
+        <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <h3 class="feature-title">Semantic Search</h3>
+            <p class="feature-description">Ask questions in natural language and get answers from your own materials.</p>
+        </div>
+    </div>
+    """, height=400)
+
+def render_demo_section():
+    st.markdown("""
+    <div class="demo-section">
+        <div class="section-header">
+            <h2 class="section-title">See It In Action</h2>
+            <p class="section-subtitle">Here's how Edu Helper transforms your study materials</p>
+        </div>
+        
+        <div class="demo-card">
+            <h3 class="demo-title">Machine Learning Fundamentals</h3>
+            <p><strong>Key Concepts:</strong> Machine learning is a subset of AI focused on developing algorithms that learn from data. It includes supervised learning (labeled data), unsupervised learning (unlabeled data), and reinforcement learning (reward-based).</p>
+            
+            <p><strong>Applications:</strong> Used in recommendation systems, image recognition, natural language processing, and predictive analytics.</p>
+            
+            <p><strong>Important Algorithms:</strong> Linear regression, decision trees, neural networks, and k-means clustering.</p>
+            
+            <p><strong>Challenges:</strong> Overfitting, underfitting, bias in data, and computational complexity.</p>
+            
+            <p style="font-style: italic; color: #718096; margin-top: 1rem;">Generated from: "Introduction to Machine Learning.pdf" (32 pages)</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_testimonials_section():
+    st.markdown("""
+    <div class="section-header">
+        <h2 class="section-title">What Students Say</h2>
+        <p class="section-subtitle">Hear from students who transformed their study habits with Edu Helper</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    components.html("""
+    <div class="testimonials-grid">
+        <div class="testimonial-card">
+            <p class="testimonial-text">"This saved me before midterms! I uploaded my psychology textbook and got perfect summaries and flashcards. The audio feature let me review while walking to class."</p>
+            <p class="testimonial-author">Aisha K.</p>
+            <p class="testimonial-role">Psychology Major</p>
+        </div>
+        
+        <div class="testimonial-card">
+            <p class="testimonial-text">"The Q&A feature is incredible. I uploaded my data structures notes and could literally ask questions about complex algorithms. It's like having a tutor available 24/7."</p>
+            <p class="testimonial-author">Raj P.</p>
+            <p class="testimonial-role">Computer Science</p>
+        </div>
+        
+        <div class="testimonial-card">
+            <p class="testimonial-text">"I used to spend hours making flashcards by hand. Now I just upload my lecture notes and get them instantly. My grades have improved and I have so much more free time!"</p>
+            <p class="testimonial-author">Maya L.</p>
+            <p class="testimonial-role">Biology Major</p>
+        </div>
+    </div>
+    """, height=300)
+
+def render_about_section():
+    st.markdown("""
+    <div class="about-section">
+        <h2 class="about-title">About the Creator</h2>
+        <h3 class="about-name">Shivang Kumar Dubey</h3>
+        <p class="about-description">First-year Scaler School of Technology student. Passionate about AI/ML and helping students succeed. Created Edu Helper to solve real problems faced by students in managing and absorbing large amounts of study material.</p>
+        
+        <div class="social-links">
+            <a href="mailto:shivangdubey731@gmail.com" class="social-link">📧 Email</a>
+            <a href="https://instagram.com/shivang.skd" target="_blank" class="social-link">📷 Instagram</a>
+            <a href="https://github.com/shivang731" target="_blank" class="social-link">💻 GitHub</a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_cta_section():
+    st.markdown("""
+    <div class="cta-section">
+        <h2 class="cta-title">Ready to Transform Your Study Habits?</h2>
+        <p class="cta-subtitle">Upload your first document and see the magic happen in seconds. No credit card required.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def main():
+    # Inject custom CSS first
+    inject_custom_css()
+    
+    # Initialize services
+    if 'parser' not in st.session_state:
+        st.session_state.parser = StudyMaterialParser()
+    if 'search_service' not in st.session_state:
+        st.session_state.search_service = SemanticSearchService()
+    if 'storage_service' not in st.session_state:
+        st.session_state.storage_service = StorageService()
+    if 'exporter_service' not in st.session_state:
+        st.session_state.exporter_service = ExporterService()
+
+    # Render landing page sections
+    render_hero_section()
+    render_features_section()
+    render_demo_section()
+    render_testimonials_section()
+    render_about_section()
+    render_cta_section()
+    
+    # File Upload Section
+    st.markdown("### 📁 Upload Your Study Material")
+    uploaded_file = st.file_uploader(
+        "Choose a PDF or TXT file",
+        type=["pdf", "txt"],
+        help="Upload your study materials to get started"
+    )
+    
+    if uploaded_file:
+        st.success(f"📄 **{uploaded_file.name}** uploaded successfully!")
+        
+        # Extract text from the uploaded file
+        try:
+            if uploaded_file.type == "application/pdf":
+                document_text = extract_text_from_pdf(uploaded_file)
+            elif uploaded_file.type == "text/plain":
+                document_text = extract_text_from_txt(uploaded_file)
+            else:
+                st.error("Unsupported file type")
+                return
+            
+            if document_text and not document_text.startswith("Error"):
+                # Clean the text using the parser
+                cleaned_text = st.session_state.parser.clean_extracted_text(document_text)
+                
+                # Setup search service
+                st.session_state.search_service.setup_index(cleaned_text)
+                
+                # Show preview
+                with st.expander("📄 Document Preview", expanded=False):
+                    st.text_area("Extracted Text", cleaned_text[:1000] + "..." if len(cleaned_text) > 1000 else cleaned_text, height=200)
+                
+                # Action buttons
+                st.markdown("### 🚀 Generate Study Materials")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("📝 Generate Summary", use_container_width=True):
+                        with st.spinner("Generating summary..."):
+                            try:
+                                summary = generate_summary(cleaned_text)
+                                st.session_state.summary = summary
+                                st.session_state.storage_service.save_summary(uploaded_file.name, summary)
+                                
+                                st.markdown("#### 📝 AI Summary")
+                                st.write(summary)
+                            except Exception as e:
+                                st.error(f"Error generating summary: {str(e)}")
+                
+                with col2:
+                    if st.button("🃏 Create Flashcards", use_container_width=True):
+                        with st.spinner("Generating flashcards..."):
+                            try:
+                                flashcards = generate_flashcards(cleaned_text, 5)
+                                st.session_state.flashcards = flashcards
+                                
+                                st.markdown("#### 🃏 Flashcards")
+                                for i, card in enumerate(flashcards):
+                                    with st.expander(f"Card {i+1}: {card.get('front', 'Question')[:50]}..."):
+                                        st.write(f"**Question:** {card.get('front', 'No question')}")
+                                        st.write(f"**Answer:** {card.get('back', 'No answer')}")
+                            except Exception as e:
+                                st.error(f"Error generating flashcards: {str(e)}")
+                
+                with col3:
+                    if st.button("🔊 Generate Audio", use_container_width=True):
+                        if hasattr(st.session_state, 'summary') and st.session_state.summary:
+                            with st.spinner("Generating audio..."):
+                                try:
+                                    audio_bytes = text_to_speech(st.session_state.summary)
+                                    if audio_bytes:
+                                        st.session_state.audio_bytes = audio_bytes
+                                        st.markdown("#### 🔊 Audio Notes")
+                                        st.audio(audio_bytes)
+                                    else:
+                                        st.error("Could not generate audio. Please try again.")
+                                except Exception as e:
+                                    st.error(f"Error generating audio: {str(e)}")
+                        else:
+                            st.warning("Generate a summary first before creating audio.")
+                
+                # Search functionality
+                st.markdown("### 🔍 Search Your Document")
+                search_query = st.text_input("Ask a question about your document:", placeholder="e.g., What are the main concepts?")
+                
+                if search_query and st.button("Search", use_container_width=True):
+                    try:
+                        results = st.session_state.search_service.search(search_query, top_k=3)
+                        
+                        st.markdown(f"#### 🔍 Search Results for: \"{search_query}\"")
+                        
+                        if results:
+                            for i, result in enumerate(results):
+                                st.markdown(f"**Result {i+1}:** {result}")
+                        else:
+                            st.info("No results found. Try a different search term.")
+                    except Exception as e:
+                        st.error(f"Error searching: {str(e)}")
+                
+            else:
+                st.error("Could not extract text from the document. Please try a different file.")
+        
+        except Exception as e:
+            st.error(f"An error occurred while processing your file: {str(e)}")
+
+if __name__ == "__main__":
+    main()
