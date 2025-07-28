@@ -1,165 +1,133 @@
 import streamlit as st
 import sys
 from pathlib import Path
-from typing import Optional, Dict, Any
 
-# Add the project root to Python path for imports
 sys.path.append(str(Path(__file__).parent.parent))
+from ui.views import (
+    render_about_contact,
+    render_document_preview, render_summary_view,
+    render_flashcards_view, render_audio_view, render_search_view
+)
+from core.fetcher import extract_text_from_pdf, extract_text_from_txt
+from core.parser import StudyMaterialParser
+from core.summarizer import generate_summary
+from core.quizgen import generate_flashcards
+from core.tts import text_to_speech
+from services.embeddings import SemanticSearchService
+from services.exporter import ExporterService
+from ui.sidebar import render_file_upload_sidebar, render_settings_sidebar
+from ui.controls import render_action_buttons, render_export_controls
 
-try:
-    from core.fetcher import extract_text_from_pdf, extract_text_from_txt
-    from core.summarizer import generate_summary
-    from core.quizgen import generate_flashcards, generate_quiz
-    from core.tts import text_to_speech
-    from core.parser import StudyMaterialParser
-    from services.embeddings import SemanticSearchService
-    from services.storage import StorageService
-    from services.exporter import ExporterService
-    from ui.sidebar import render_file_upload_sidebar, render_settings_sidebar, render_help_sidebar
-    from ui.views import render_document_preview, render_summary_view, render_flashcards_view, render_audio_view, render_search_view
-    from ui.controls import render_action_buttons, render_flashcard_controls, render_search_controls, render_export_controls
-except ImportError as e:
-    st.error(f"Import error: {e}")
-    st.error("Please ensure all required modules are installed and available.")
-    st.stop()
-
-# Configure the Streamlit page
+# Page config
 st.set_page_config(
     page_title="Smart Study-Aid Generator",
     page_icon="📚",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-def main():
-    """Main application function."""
-    st.title("📚 Smart Study-Aid Generator")
-    st.markdown("Welcome! Upload your study materials to transform them into summaries, flashcards, and audio notes.")
-    
-    # Initialize services
-    if 'parser' not in st.session_state:
-        st.session_state.parser = StudyMaterialParser()
-    if 'search_service' not in st.session_state:
-        st.session_state.search_service = SemanticSearchService()
-    if 'storage_service' not in st.session_state:
-        st.session_state.storage_service = StorageService()
-    if 'exporter_service' not in st.session_state:
-        st.session_state.exporter_service = ExporterService()
-    
-    # Sidebar
-    with st.sidebar:
-        uploaded_file, file_stats = render_file_upload_sidebar()
-        settings = render_settings_sidebar()
-        render_help_sidebar()
-    
-    # Main content area
-    if uploaded_file:
-        st.success(f"📄 **{uploaded_file.name}** uploaded successfully!")
-        
-        # Extract text from the uploaded file
-        try:
-            if uploaded_file.type == "application/pdf":
-                document_text = extract_text_from_pdf(uploaded_file)
-            elif uploaded_file.type == "text/plain":
-                document_text = extract_text_from_txt(uploaded_file)
-            else:
-                st.error("Unsupported file type")
-                return
-        except Exception as e:
-            st.error(f"Error extracting text: {str(e)}")
-            return
-        
-        # Show document preview
-        if document_text and not document_text.startswith("Error"):
-            # Clean the text using the parser
-            cleaned_text = st.session_state.parser.clean_extracted_text(document_text)
-            
-            # Show document preview
-            render_document_preview(cleaned_text, uploaded_file.name)
-            
-            # Setup search service
-            st.session_state.search_service.setup_index(cleaned_text)
-            
-            # Action buttons
-            actions = render_action_buttons(True)
-            
-            # Handle summary generation
-            if actions.get('summary'):
-                with st.spinner("Generating summary..."):
-                    try:
-                        summary = generate_summary(cleaned_text)
-                        st.session_state.summary = summary
-                        st.session_state.storage_service.save_summary(uploaded_file.name, summary)
-                        render_summary_view(summary)
-                    except Exception as e:
-                        st.error(f"Error generating summary: {str(e)}")
-            
-            # Handle flashcard generation
-            if actions.get('flashcards'):
-                with st.spinner("Generating flashcards..."):
-                    try:
-                        flashcards = generate_flashcards(cleaned_text, settings['flashcards']['count'])
-                        st.session_state.flashcards = flashcards
-                        render_flashcards_view(flashcards)
-                    except Exception as e:
-                        st.error(f"Error generating flashcards: {str(e)}")
-            
-            # Handle audio generation
-            if actions.get('audio'):
-                if hasattr(st.session_state, 'summary') and st.session_state.summary:
-                    with st.spinner("Generating audio..."):
-                        try:
-                            audio_bytes = text_to_speech(
-                                st.session_state.summary,
-                                language=settings['audio']['language'],
-                                slow=(settings['audio']['speed'] == 'slow')
-                            )
-                            st.session_state.audio_bytes = audio_bytes
-                            render_audio_view(audio_bytes)
-                        except Exception as e:
-                            st.error(f"Error generating audio: {str(e)}")
-                else:
-                    st.warning("Generate a summary first before creating audio.")
-            
-            # Search functionality
-            search_controls = render_search_controls()
-            if search_controls.get('go'):
-                try:
-                    results = st.session_state.search_service.search(
-                        search_controls['query'], 
-                        top_k=search_controls['k']
-                    )
-                    render_search_view(results, search_controls['query'])
-                except Exception as e:
-                    st.error(f"Error during search: {str(e)}")
-            
-            # Export functionality
-            available_exports = []
-            if hasattr(st.session_state, 'summary'):
-                available_exports.append('summary')
-            if hasattr(st.session_state, 'flashcards'):
-                available_exports.append('flashcards')
-            
-            if available_exports:
-                export_controls = render_export_controls(available_exports)
-                if export_controls.get('export'):
-                    try:
-                        if export_controls['format'] == 'markdown':
-                            if 'summary' in available_exports:
-                                filename = st.session_state.exporter_service.export_summary_md(
-                                    uploaded_file.name, st.session_state.summary
-                                )
-                                st.success(f"Summary exported to {filename}")
-                            if 'flashcards' in available_exports:
-                                filename = st.session_state.exporter_service.export_flashcards_md(
-                                    uploaded_file.name, st.session_state.flashcards
-                                )
-                                st.success(f"Flashcards exported to {filename}")
-                    except Exception as e:
-                        st.error(f"Error during export: {str(e)}")
-        else:
-            st.error("Could not extract text from the document.")
-    else:
-        st.info("Upload a document in the sidebar to get started!")
+# Custom CSS for top-right menu & modern styling
+st.markdown(
+    """
+    <style>
+      .top-menu { position: fixed; top: 1rem; right: 2rem; }
+      .top-menu a { margin-left: 1rem; color: white; font-weight: bold; text-decoration: none; }
+      .top-menu a:hover { color: #ffdd57; }
+      .header-bg {
+        background: linear-gradient(135deg, #4e54c8, #8f94fb);
+        padding: 2rem 0;
+        text-align: center;
+        color: white;
+        border-radius: 0 0 20px 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-if __name__ == "__main__":
-    main()
+# Top-right About & Contact links
+st.markdown(
+    """
+    <div class="top-menu">
+      <a href="#about">About</a>
+      <a href="#contact">Connect</a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# Header
+st.markdown('<div class="header-bg"><h1>📚 Smart Study-Aid Generator</h1></div>', unsafe_allow_html=True)
+
+# About & Contact Section
+render_about_contact()
+
+# Initialize services
+if 'parser' not in st.session_state:
+    st.session_state.parser = StudyMaterialParser()
+if 'search' not in st.session_state:
+    st.session_state.search = SemanticSearchService()
+if 'exporter' not in st.session_state:
+    st.session_state.exporter = ExporterService()
+
+# Sidebar
+with st.sidebar:
+    uploaded_file, stats = render_file_upload_sidebar()
+    settings = render_settings_sidebar()
+
+if not uploaded_file:
+    st.info("Upload your PDF or TXT to begin.")
+    st.stop()
+
+# File upload success
+st.success(f"Uploaded: **{uploaded_file.name}**")
+
+# Extract & clean text
+if uploaded_file.type == "application/pdf":
+    raw = extract_text_from_pdf(uploaded_file)
+else:
+    raw = extract_text_from_txt(uploaded_file)
+clean = st.session_state.parser.clean_extracted_text(raw)
+render_document_preview(clean, uploaded_file.name)
+st.session_state.search.setup_index(clean)
+
+# Action buttons
+actions = render_action_buttons(enabled=True)
+if actions.get("summary"):
+    summary = generate_summary(clean)
+    st.session_state.summary = summary
+    render_summary_view(summary)
+if actions.get("flashcards"):
+    cards = generate_flashcards(clean)
+    st.session_state.flashcards = cards
+    render_flashcards_view(cards)
+if actions.get("audio"):
+    if hasattr(st.session_state, "summary"):
+        audio = text_to_speech(st.session_state.summary)
+        st.session_state.audio = audio
+        render_audio_view(audio)
+    else:
+        st.warning("Generate a summary first.")
+if actions.get("search"):
+    query = settings["search"]["query"]
+    results = st.session_state.search.search(query)
+    render_search_view(results, query)
+
+# Export controls
+exports = render_export_controls(
+    has_summary="summary" in st.session_state,
+    has_flashcards="flashcards" in st.session_state
+)
+if exports.get("export"):
+    if exports["format"] == "markdown":
+        if "summary" in st.session_state:
+            fn = st.session_state.exporter.export_summary_md(
+                uploaded_file.name, st.session_state.summary
+            )
+            st.success(f"Summary saved: {fn}")
+        if "flashcards" in st.session_state:
+            fn = st.session_state.exporter.export_flashcards_md(
+                uploaded_file.name, st.session_state.flashcards
+            )
+            st.success(f"Flashcards saved: {fn}")
