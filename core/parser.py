@@ -25,15 +25,3 @@ class StudyMaterialParser:
         text = re.sub(r'([,.!?;:])\s*([,.!?;:])', r'\1 \2', text)
         
         return text.strip()
-    
-    def extract_key_sentences(self, text, max_sentences=10):
-        """Extract key sentences from text for summary."""
-        sentences = re.split(r'[.!?]+', text)
-        sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
-        return sentences[:max_sentences]
-    
-    def extract_keywords(self, text):
-        """Extract potential keywords from text."""
-        # Simple keyword extraction - can be improved with NLP libraries
-        words = re.findall(r'\b[A-Z][a-z]+\b', text)  # Capitalized words
-        return list(set(words))
