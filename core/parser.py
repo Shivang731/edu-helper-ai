@@ -1,348 +1,185 @@
-(cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF'
-diff --git a/core/parser.py b/core/parser.py
---- a/core/parser.py
-+++ b/core/parser.py
-@@ -1,126 +1,215 @@
--"""
--Text parsing and preprocessing utilities for Smart Study-Aid Generator.
--
--This module handles the cleaning, structuring, and preprocessing of text
--extracted from study materials. It makes raw document text ready for
--AI analysis, summarization, and flashcard generation.
--
--Author: Shivang 
--
--"""
--
--import re
--import string
--from typing import List, Dict, Optional, Tuple
--import nltk
--
--# Download NLTK data quietly (happens once per session)
--try:
--    nltk.data.find('tokenizers/punkt')
--    nltk.data.find('corpora/stopwords')
--except LookupError:
--    nltk.download('punkt', quiet=True)
--    nltk.download('stopwords', quiet=True)
--
--from nltk.corpus import stopwords
--from nltk.tokenize import sent_tokenize, word_tokenize
--
--
--class StudyMaterialParser:
--    """
--    A specialized parser for academic and study materials.
--    
--    This class provides methods to clean messy text from PDFs,
--    extract key information, and prepare content for AI processing.
--    """
--    
--    def __init__(self, language='english'):
--        """
--        Initialize the parser with language settings.
--        
--        Args:
--            language (str): Language for stop words and processing
--        """
--        self.language = language
--        try:
--            self.stop_words = set(stopwords.words(language))
--        except: Fallback to English if language not available
--            self.stop_words = set(stopwords.words('english'))
--    
--    def clean_extracted_text(self, raw_text: str) -> str:
--        """
--        Clean and normalize text extracted from documents.
--        
--        This function handles common issues with PDF text extraction:
--        - Extra whitespace and line breaks
--        - OCR errors and weird characters
--        - Inconsistent formatting
--        
--        Args:
--            raw_text (str): Raw text from document extraction
--            
--        Returns:
--            str: Clean, normalized text ready for analysis
--        """
--        if not raw_text or raw_text.startswith("Error"):
--            return raw_text
--        
--        # Step 1: Fix common OCR mistakes
--        text = self._fix_common_ocr_errors(raw_text)
--        
--        # Step 2: Normalize whitespace
--        text = re.sub(r'\s+', ' ', text)  # Multiple spaces to single space
--        text = re.sub(r'\n+', '\n', text)  # Multiple newlines to single
--        
--        # Step 3: Remove weird characters but keep important punctuation
--        text = re.sub(r'[^\w\s\.\,\!\?\;\:\-\(\)\[\]\"\'\n]', ' ', text)
--        
--        # Step 4: Clean up extra spaces again
--        text = re.sub(r' +', ' ', text)
--        
--        # Step 5: Remove very short "words" that are likely OCR errors
--        words = text.split()
--        cleaned_words = [word for word in words if len(word) > 1 or word in '.,!?']
--        
--        return ' '.join(cleaned_words).strip()
--    
--    def find_document_sections(self, text: str) -> Dict[str, str]:
--        """
--        Try to identify different sections in academic documents.
--        
--        Looks for common section headers like:
--        - Introduction, Abstract, Methods
--        - Chapter headings, numbered sections
--        - Conclusion, References
--        
--        Args:
--            text (str): Document text to analyze
--            
--        Returns:
--            dict: Mapping of section names to their content
--        """
--        sections = {}
--        text_lower = text.lower()
--        
--        # Common patterns for academic sections
--        section_patterns = {
--            'abstract': r'(abstract|summary)[\s\n:]+',
--            'introduction': r'(introduction|intro|chapter\s*1)[\s\n:]+',
--            'methods': r'(methodology|methods|approach|materials)[\s\n:]+',
--            'results': r'(results|findings|outcomes)[\s\n:]+',
--            'discussion': r'(discussion|analysis|interpretation)[\s\n:]+',
--            'conclusion': r'(conclusion|conclusions|final|summary)[\s\n:]+'
--        }
--        
--        # Look for each section pattern
--        for section_name, pattern in section_patterns.items():
--            matches = list(re.finditer(pattern, text_lower))
--            
--            if matches:
--                start_pos = matches[0].start()
--                
--                # Find where this section ends (next section starts)
--                end_positions = []
--                for other_pattern in section_patterns.values():
--                    other_matches = re.finditer(other_pattern, text_lower[start_pos + 100:])
--                    for match in other_matches:
-+"""
-+Text parsing and preprocessing utilities for Smart Study-Aid Generator.
-+
-+This module handles the cleaning, structuring, and preprocessing of text
-+extracted from study materials. It makes raw document text ready for
-+AI analysis, summarization, and flashcard generation.
-+
-+Author: Shivang 
-+
-+"""
-+
-+import re
-+import string
-+from typing import List, Dict, Optional, Tuple
-+import nltk
-+
-+# Download NLTK data quietly (happens once per session)
-+try:
-+    nltk.data.find('tokenizers/punkt')
-+    nltk.data.find('corpora/stopwords')
-+except LookupError:
-+    nltk.download('punkt', quiet=True)
-+    nltk.download('stopwords', quiet=True)
-+
-+from nltk.corpus import stopwords
-+from nltk.tokenize import sent_tokenize, word_tokenize
-+
-+
-+class StudyMaterialParser:
-+    """
-+    A specialized parser for academic and study materials.
-+    
-+    This class provides methods to clean messy text from PDFs,
-+    extract key information, and prepare content for AI processing.
-+    """
-+    
-+    def __init__(self, language='english'):
-+        """
-+        Initialize the parser with language settings.
-+        
-+        Args:
-+            language (str): Language for stop words and processing
-+        """
-+        self.language = language
-+        try:
-+            self.stop_words = set(stopwords.words(language))
-+        except:  # Fallback to English if language not available
-+            self.stop_words = set(stopwords.words('english'))
-+    
-+    def clean_extracted_text(self, raw_text: str) -> str:
-+        """
-+        Clean and normalize text extracted from documents.
-+        
-+        This function handles common issues with PDF text extraction:
-+        - Extra whitespace and line breaks
-+        - OCR errors and weird characters
-+        - Inconsistent formatting
-+        
-+        Args:
-+            raw_text (str): Raw text from document extraction
-+            
-+        Returns:
-+            str: Clean, normalized text ready for analysis
-+        """
-+        if not raw_text or raw_text.startswith("Error"):
-+            return raw_text
-+        
-+        # Step 1: Fix common OCR mistakes
-+        text = self._fix_common_ocr_errors(raw_text)
-+        
-+        # Step 2: Normalize whitespace
-+        text = re.sub(r'\s+', ' ', text)  # Multiple spaces to single space
-+        text = re.sub(r'\n+', '\n', text)  # Multiple newlines to single
-+        
-+        # Step 3: Remove weird characters but keep important punctuation
-+        text = re.sub(r'[^\w\s\.\,\!\?\;\:\-\(\)\[\]\"\'\n]', ' ', text)
-+        
-+        # Step 4: Clean up extra spaces again
-+        text = re.sub(r' +', ' ', text)
-+        
-+        # Step 5: Remove very short "words" that are likely OCR errors
-+        words = text.split()
-+        cleaned_words = [word for word in words if len(word) > 1 or word in '.,!?']
-+        
-+        return ' '.join(cleaned_words).strip()
-+    
-+    def find_document_sections(self, text: str) -> Dict[str, str]:
-+        """
-+        Try to identify different sections in academic documents.
-+        
-+        Looks for common section headers like:
-+        - Introduction, Abstract, Methods
-+        - Chapter headings, numbered sections
-+        - Conclusion, References
-+        
-+        Args:
-+            text (str): Document text to analyze
-+            
-+        Returns:
-+            dict: Mapping of section names to their content
-+        """
-+        sections = {}
-+        text_lower = text.lower()
-+        
-+        # Common patterns for academic sections
-+        section_patterns = {
-+            'abstract': r'(abstract|summary)[\s\n:]+',
-+            'introduction': r'(introduction|intro|chapter\s*1)[\s\n:]+',
-+            'methods': r'(methodology|methods|approach|materials)[\s\n:]+',
-+            'results': r'(results|findings|outcomes)[\s\n:]+',
-+            'discussion': r'(discussion|analysis|interpretation)[\s\n:]+',
-+            'conclusion': r'(conclusion|conclusions|final|summary)[\s\n:]+'
-+        }
-+        
-+        # Look for each section pattern
-+        for section_name, pattern in section_patterns.items():
-+            matches = list(re.finditer(pattern, text_lower))
-+            
-+            if matches:
-+                start_pos = matches[0].start()
-+                
-+                # Find where this section ends (next section starts)
-+                end_positions = []
-+                for other_pattern in section_patterns.values():
-+                    other_matches = re.finditer(other_pattern, text_lower[start_pos + 100:])
-+                    for match in other_matches:
-+                        end_positions.append(start_pos + 100 + match.start())
-+                
-+                # If we found other sections, use the earliest one as end
-+                if end_positions:
-+                    end_pos = min(end_positions)
-+                else:
-+                    end_pos = len(text)
-+                
-+                # Extract the section content
-+                section_content = text[start_pos:end_pos].strip()
-+                if section_content:
-+                    sections[section_name] = section_content
-+        
-+        return sections
-+    
-+    def _fix_common_ocr_errors(self, text: str) -> str:
-+        """
-+        Fix common OCR errors in extracted text.
-+        
-+        Args:
-+            text (str): Raw text with potential OCR errors
-+            
-+        Returns:
-+            str: Text with common OCR errors fixed
-+        """
-+        # Common OCR replacements
-+        ocr_fixes = {
-+            '0': 'o',  # Zero to lowercase o
-+            '1': 'l',  # One to lowercase l (in some contexts)
-+            '5': 's',  # Five to lowercase s
-+            '8': 'B',  # Eight to uppercase B
-+            '|': 'I',  # Pipe to uppercase I
-+            '[': '(',  # Square bracket to parenthesis
-+            ']': ')',  # Square bracket to parenthesis
-+        }
-+        
-+        # Apply fixes (be conservative)
-+        for wrong, correct in ocr_fixes.items():
-+            # Only replace in context where it makes sense
-+            text = re.sub(rf'\b{wrong}\b', correct, text)
-+        
-+        return text
-+    
-+    def extract_key_terms(self, text: str, max_terms: int = 20) -> List[str]:
-+        """
-+        Extract key terms from the document for better understanding.
-+        
-+        Args:
-+            text (str): Document text
-+            max_terms (int): Maximum number of terms to extract
-+            
-+        Returns:
-+            List[str]: List of key terms
-+        """
-+        # Tokenize and get word frequencies
-+        words = word_tokenize(text.lower())
-+        words = [word for word in words if word.isalpha() and word not in self.stop_words]
-+        
-+        # Count frequencies
-+        word_freq = {}
-+        for word in words:
-+            if len(word) > 3:  # Only consider words longer than 3 characters
-+                word_freq[word] = word_freq.get(word, 0) + 1
-+        
-+        # Sort by frequency and return top terms
-+        sorted_terms = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
-+        return [term for term, freq in sorted_terms[:max_terms]]
-+    
-+    def get_document_stats(self, text: str) -> Dict[str, any]:
-+        """
-+        Get basic statistics about the document.
-+        
-+        Args:
-+            text (str): Document text
-+            
-+        Returns:
-+            Dict: Document statistics
-+        """
-+        words = word_tokenize(text)
-+        sentences = sent_tokenize(text)
-+        
-+        return {
-+            'word_count': len(words),
-+            'sentence_count': len(sentences),
-+            'avg_sentence_length': len(words) / len(sentences) if sentences else 0,
-+            'unique_words': len(set(word.lower() for word in words if word.isalpha())),
-+            'estimated_reading_time': len(words) / 200  # Assuming 200 words per minute
-+        }
-+
-EOF
-)
+import re
+from typing import List, Optional
+import unicodedata
+
+class StudyMaterialParser:
+    """Parser for cleaning and processing extracted study material text."""
+    
+    def __init__(self):
+        # Common patterns to remove or clean
+        self.header_footer_patterns = [
+            r'\b(?:page|pg\.?)\s*\d+\b',  # Page numbers
+            r'\b\d{1,3}(?:st|nd|rd|th)?\s+(?:page|pg\.?)',  # Page references
+            r'©.*?\d{4}',  # Copyright notices
+            r'all rights reserved',  # Rights notices
+            r'confidential.*?material',  # Confidential labels
+        ]
+        
+        # Patterns for academic text structure
+        self.section_patterns = [
+            r'^(?:chapter|section|part|unit)\s+\d+',  # Chapter/Section headers
+            r'^\d+\.\s*[A-Z]',  # Numbered sections
+            r'^[A-Z][A-Z\s]{2,}$',  # ALL CAPS headers
+        ]
+        
+    def clean_extracted_text(self, text: str) -> str:
+        """
+        Clean and normalize extracted text from PDFs/TXT files.
+        
+        Args:
+            text (str): Raw extracted text
+            
+        Returns:
+            str: Cleaned and normalized text
+        """
+        if not text or text.startswith("Error"):
+            return text
+            
+        # Normalize Unicode characters
+        text = unicodedata.normalize('NFKC', text)
+        
+        # Remove excessive whitespace and normalize line breaks
+        text = re.sub(r'\n{3,}', '\n\n', text)  # Max 2 consecutive newlines
+        text = re.sub(r'[ \t]+', ' ', text)     # Multiple spaces/tabs to single space
+        text = re.sub(r' +\n', '\n', text)      # Remove trailing spaces before newlines
+        
+        # Remove common header/footer patterns
+        for pattern in self.header_footer_patterns:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+        
+        # Fix common OCR errors
+        text = self.fix_ocr_errors(text)
+        
+        # Clean up bullet points and lists
+        text = self.normalize_lists(text)
+        
+        # Remove excessive punctuation
+        text = re.sub(r'[.]{3,}', '...', text)  # Multiple dots to ellipsis
+        text = re.sub(r'[-]{3,}', '---', text)  # Multiple dashes to em-dash
+        
+        # Final cleanup
+        text = text.strip()
+        
+        return text
+    
+    def fix_ocr_errors(self, text: str) -> str:
+        """Fix common OCR errors in text."""
+        ocr_fixes = {
+            r'\bl\b': 'I',  # Standalone 'l' often should be 'I'
+            r'\b0\b(?=\s+[a-z])': 'O',  # Zero that should be letter O
+            r'rn': 'm',  # Common OCR error
+            r'vv': 'w',  # Another common error
+            r'\btuming\b': 'turning',
+            r'\bwbere\b': 'where',
+            r'\bvvhen\b': 'when',
+            r'\bvvhat\b': 'what',
+            r'\bvvith\b': 'with',
+        }
+        
+        for pattern, replacement in ocr_fixes.items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+            
+        return text
+    
+    def normalize_lists(self, text: str) -> str:
+        """Normalize bullet points and numbered lists."""
+        # Convert various bullet symbols to standard bullet
+        text = re.sub(r'[•◦▪▫‣⁃]', '•', text)
+        
+        # Ensure proper spacing around list items
+        text = re.sub(r'\n•\s*', '\n• ', text)
+        text = re.sub(r'\n(\d+\.)\s*', r'\n\1 ', text)
+        
+        return text
+    
+    def extract_sections(self, text: str) -> List[dict]:
+        """
+        Extract major sections from the text.
+        
+        Args:
+            text (str): Cleaned text
+            
+        Returns:
+            List[dict]: List of sections with titles and content
+        """
+        sections = []
+        lines = text.split('\n')
+        current_section = {'title': 'Introduction', 'content': ''}
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Check if line is a section header
+            is_header = False
+            for pattern in self.section_patterns:
+                if re.match(pattern, line, re.IGNORECASE):
+                    # Save current section if it has content
+                    if current_section['content'].strip():
+                        sections.append(current_section)
+                    
+                    # Start new section
+                    current_section = {'title': line, 'content': ''}
+                    is_header = True
+                    break
+            
+            if not is_header:
+                current_section['content'] += line + '\n'
+        
+        # Add the last section
+        if current_section['content'].strip():
+            sections.append(current_section)
+        
+        return sections
+    
+    def extract_key_terms(self, text: str) -> List[str]:
+        """
+        Extract potential key terms from the text.
+        
+        Args:
+            text (str): Text to analyze
+            
+        Returns:
+            List[str]: List of key terms
+        """
+        # Find capitalized terms (potential proper nouns/key concepts)
+        capitalized_terms = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', text)
+        
+        # Find terms in bold or italics (if markup exists)
+        bold_terms = re.findall(r'\*\*(.*?)\*\*', text)
+        italic_terms = re.findall(r'\*(.*?)\*', text)
+        
+        # Combine and deduplicate
+        key_terms = list(set(capitalized_terms + bold_terms + italic_terms))
+        
+        # Filter out common words and very short terms
+        common_words = {'The', 'This', 'That', 'With', 'From', 'They', 'When', 'Where', 'What', 'How'}
+        key_terms = [term for term in key_terms if len(term) > 2 and term not in common_words]
+        
+        return key_terms[:50]  # Return top 50 terms
+    
+    def get_reading_stats(self, text: str) -> dict:
+        """
+        Get reading statistics for the text.
+        
+        Args:
+            text (str): Text to analyze
+            
+        Returns:
+            dict: Reading statistics
+        """
+        words = text.split()
+        sentences = re.split(r'[.!?]+', text)
+        paragraphs = [p for p in text.split('\n\n') if p.strip()]
+        
+        # Estimate reading time (average 200 words per minute)
+        reading_time = len(words) / 200
+        
+        return {
+            'word_count': len(words),
+            'sentence_count': len([s for s in sentences if s.strip()]),
+            'paragraph_count': len(paragraphs),
+            'character_count': len(text),
+            'estimated_reading_time': f"{reading_time:.1f} minutes"
+        }
