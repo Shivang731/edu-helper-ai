@@ -9,7 +9,9 @@ import streamlit as st
 from typing import Tuple, Optional
 
 
-def render_file_upload_sidebar() -> Tuple[Optional[object the file upload section in the sidebar.
+def render_file_upload_sidebar() -> Tuple[Optional[object], dict]:
+    """
+    Render the file upload section in the sidebar.
     
     Returns:
         tuple: (uploaded_file, file_stats) where file_stats contains metadata
