@@ -1,542 +1,308 @@
-(cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF'
-diff --git a/ui/sidebar.py b/ui/sidebar.py
---- a/ui/sidebar.py
-+++ b/ui/sidebar.py
-@@ -1,266 +1,269 @@
--"""
--Sidebar components 
--
--Contains file upload interface, settings panels, and navigation elements
--that appear in the Streamlit sidebar.
--"""
--
--import streamlit as st
--from typing import Tuple, Optional
--
--
--def render_file_upload_sidebar() -> Tuple[Optional[object the file upload section in the sidebar.
--    
--    Returns:
--        tuple: (uploaded_file, file_stats) where file_stats contains metadata
--    """
--    st.header("📂 Upload Study Material")
--    st.markdown("Upload your notes, textbooks, or research papers to get started!")
--    
--    uploaded_file = st.file_uploader(
--        "Choose a PDF or TXT file",
--        type=["pdf", "txt"],
--        help="Supported formats: PDF, TXT. Max size: 200MB",
--        accept_multiple_files=False
--    )
--    
--    file_stats = {}
--    
--    if uploaded_file is not None:
--        # Display file information
--        file_stats = {
--            'name': uploaded_file.name,
--            'size': uploaded_file.size,
--            'type': uploaded_file.type
--        }
--        
--        # Show file details in a nice format
--        st.success(f"✅ **{uploaded_file.name}** uploaded successfully!")
--        
--        # File size in human-readable format
--        size_mb = uploaded_file.size / (1024 * 1024)
--        if size_mb < 1:
--            size_str = f"{uploaded_file.size / 1024:.1f} KB"
--        else:
--            size_str = f"{size_mb:.1f} MB"
--        
--        st.info(f"""
--        **File Details:**
--        - **Size:** {size_str}
--        - **Type:** {uploaded_file.type}
--        """)
--        
--        # Warning for large files
--        if size_mb > 50:
--            st.warning("⚠️ Large file detected. Processing may take longer.")
--    
--    else:
--        st.info("👆 Upload a document to begin creating study aids!")
--    
--    return uploaded_file, file_stats
--
--
--def render_settings_sidebar() -> dict:
--    """
--    Render the settings and configuration panel in the sidebar.
--    
--    Returns:
--        dict: Dictionary containing all user settings
--    """
--    st.markdown("---")  # Divider
--    st.header("⚙️ Study Aid Settings")
--    
--    # Summary settings
--    st.subheader("📝 Summary Options")
--    summary_length = st.selectbox(
--        "Summary Length",
--        options=["Short (50-100 words)", "Medium (100-200 words)", "Long (200-300 words)"],
--        index=1,
--        help="Choose how detailed you want your AI summary to be"
--    )
--    
--    summary_style = st.radio(
--        "Summary Style",
--        options=["Academic", "Simple", "Bullet Points"],
--        index=0,
--        help="Select the writing style for your summary"
--    )
--    
--    # Flashcard settings
--    st.subheader("🃏 Flashcard Options")
--    num_flashcards = st.slider(
--        "Number of Flashcards",
--        min_value=5,
--        max_value=25,
--        value=10,
--        step=1,
--        help="How many flashcards to generate from your document"
--    )
--    
--    flashcard_difficulty = st.selectbox(
--        "Difficulty Level",
--        options=["Easy", "Medium", "Hard"],
--        index=1,
--        help="Choose the complexity of questions and answers"
--    )
--    
--    # Audio settings
--    st.subheader("🔊 Audio Options")
--    tts_language = st.selectbox(
--        "Language",
--        options=[
--            ("English", "en"),
--            ("Spanish", "es"), 
--            ("French", "fr"),
--            ("German", "de"),
--            ("Italian", "it")
--        ],
--        format_func=lambda x: x[0],
--        index=0,
--        help="Select the language for text-to-speech"
--    )
--    
--    speech_speed = st.selectbox(
--        "Speech Speed",
--        options=["Slow", "Normal", "Fast"],
--        index=1,
--        help="Choose how fast the audio should be spoken"
--    )
--    
--    # Search settings
--    st.subheader("🔍 Search Options")
--    search_results_count = st.slider(
--        "Search Results",
--        min_value=3,
--        max_value=10,
--        value=5,
--        help="Number of relevant passages to show in search results"
--    )
--    
--    # Export settings
--    st.subheader("📄 Export Options")
--    export_format = st.multiselect(
--        "Export Formats",
--        options=["PDF", "Markdown", "Plain Text"],
--        default=["PDF"],
--        help="Choose which formats to export your study aids to"
--    )
--    
--    # Compile all settings into a dictionary
--    settings = {
--        'summary': {
--            'length': summary_length,
--            'style': summary_style
--        },
--        'flashcards': {
--            'count': num_flashcards,
--            'difficulty': flashcard_difficulty
--        },
--        'audio': {
--            'language': tts_language[1],  # Get the language code
--            'language_name': tts_language[0],  # Get the display name
--            'speed': speech_speed.lower()
--        },
--        'search': {
--            'results_count': search_results_count
--        },
--        'export': {
--            'formats': export_format
--        }
--    }
--    
--    return settings
--
--
--def render_help_sidebar():
--    """
--    Render a help and tips section in the sidebar.
--    """
--    st.markdown("---")
--    st.header("💡 Tips & Help")
--    
--    with st.expander("📚 How to Use"):
--        st.markdown("""
--        **Step 1:** Upload your study material (PDF or TXT)
--        
--        **Step 2:** Adjust settings in the sidebar
--        
--        **Step 3:** Use the tabs to:
--        - Generate AI summaries
--        - Create flashcards for review
--        - Convert text to audio
--        - Search through your content
--        
--        **Step 4:** Export your study aids when ready!
--        """)
--    
--    with st.expander("🎯 Best Practices"):
--        st.markdown("""
--        - **Upload quality documents:** Clear, well-formatted PDFs work best
--        - **Use descriptive filenames:** This helps with organization
--        - **Start with summaries:** Get an overview before diving into flashcards
--        - **Try audio mode:** Great for reviewing while commuting
--        - **Use search frequently:** Find specific topics quickly
--        """)
--    
--    with st.expander("⚡ Troubleshooting"):
--        st.markdown("""
--        - **Slow processing?** Try shorter documents or reduce flashcard count
--        - **Poor text extraction?** Ensure your PDF has selectable text, not just images
--        - **Audio not working?** Check your browser's audio settings
--        - **Search not finding results?** Try different keywords or phrases
--        """)
--    
--    # Contact/feedback section
--    st.markdown("---")
--    st.markdown("**Need Help?**")
--    st.markdown("📧 Contact: [your-email@domain.com]")
--    st.markdown("⭐ [Rate this app](your-feedback-link)")
--
--
--def render_progress_sidebar(current_step: str = "upload"):
--    """
--    Render a progress indicator showing the current step in the workflow.
--    
--    Args:
--        current_step (str): Current step ('upload', 'processing', 'results', 'export')
--    """
--    st.markdown("---")
--    st.header("📊 Progress")
--    
--    steps = {
--        'upload': '📂 Upload Document',
--        'processing': '🤖 AI Processing', 
--        'results': '📋 Review Results',
--        'export': '💾 Export & Save'
--    }
--    
--    step_order = ['upload', 'processing', 'results', 'export']
--    current_index = step_order.index(current_step) if current_step in step_order else 0
--    
--    for i, (step_key, step_name) in enumerate(steps.items()):
--        if i < current_index:
--            st.success(f"✅ {step_name}")
--        elif i == current_index:
--            st.info(f"🔄 {step_name}")
--        else:
--            st.write(f"⏳ {step_name}")
--
--
--# Example usage and testing
--if __name__ == "__main__":
--    st.set_page_config(page_title="Sidebar Test", layout="wide")
--    
--    with st.sidebar:
--        uploaded_file, file_stats = render_file_upload_sidebar()
--        settings = render_settings_sidebar()
--        render_help_sidebar()
--        render_progress_sidebar("processing")
--    
--    # Show results in main area for testing
--    st.title("Sidebar Components Test")
--    
--    if uploaded_file:
--        st.write("**File Info:**", file_stats)
--    
--    st.write("**Settings:**", settings)
-+"""
-+Sidebar components 
-+
-+Contains file upload interface, settings panels, and navigation elements
-+that appear in the Streamlit sidebar.
-+"""
-+
-+import streamlit as st
-+from typing import Tuple, Optional
-+
-+
-+def render_file_upload_sidebar() -> Tuple[Optional[object], dict]:
-+    """
-+    Render the file upload section in the sidebar.
-+    
-+    Returns:
-+        tuple: (uploaded_file, file_stats) where file_stats contains metadata
-+    """
-+    st.header("📂 Upload Study Material")
-+    st.markdown("Upload your notes, textbooks, or research papers to get started!")
-+    
-+    uploaded_file = st.file_uploader(
-+        "Choose a PDF or TXT file",
-+        type=["pdf", "txt"],
-+        help="Supported formats: PDF, TXT. Max size: 200MB",
-+        accept_multiple_files=False
-+    )
-+    
-+    file_stats = {}
-+    
-+    if uploaded_file is not None:
-+        # Display file information
-+        file_stats = {
-+            'name': uploaded_file.name,
-+            'size': uploaded_file.size,
-+            'type': uploaded_file.type
-+        }
-+        
-+        # Show file details in a nice format
-+        st.success(f"✅ **{uploaded_file.name}** uploaded successfully!")
-+        
-+        # File size in human-readable format
-+        size_mb = uploaded_file.size / (1024 * 1024)
-+        if size_mb < 1:
-+            size_str = f"{uploaded_file.size / 1024:.1f} KB"
-+        else:
-+            size_str = f"{size_mb:.1f} MB"
-+        
-+        st.info(f"""
-+        **File Details:**
-+        - **Size:** {size_str}
-+        - **Type:** {uploaded_file.type}
-+        """)
-+        
-+        # Warning for large files
-+        if size_mb > 50:
-+            st.warning("⚠️ Large file detected. Processing may take longer.")
-+    
-+    else:
-+        st.info("👆 Upload a document to begin creating study aids!")
-+    
-+    return uploaded_file, file_stats
-+
-+
-+def render_settings_sidebar() -> dict:
-+    """
-+    Render the settings and configuration panel in the sidebar.
-+    
-+    Returns:
-+        dict: Dictionary containing all user settings
-+    """
-+    st.markdown("---")  # Divider
-+    st.header("⚙️ Study Aid Settings")
-+    
-+    # Summary settings
-+    st.subheader("📝 Summary Options")
-+    summary_length = st.selectbox(
-+        "Summary Length",
-+        options=["Short (50-100 words)", "Medium (100-200 words)", "Long (200-300 words)"],
-+        index=1,
-+        help="Choose how detailed you want your AI summary to be"
-+    )
-+    
-+    summary_style = st.radio(
-+        "Summary Style",
-+        options=["Academic", "Simple", "Bullet Points"],
-+        index=0,
-+        help="Select the writing style for your summary"
-+    )
-+    
-+    # Flashcard settings
-+    st.subheader("🃏 Flashcard Options")
-+    num_flashcards = st.slider(
-+        "Number of Flashcards",
-+        min_value=5,
-+        max_value=25,
-+        value=10,
-+        step=1,
-+        help="How many flashcards to generate from your document"
-+    )
-+    
-+    flashcard_difficulty = st.selectbox(
-+        "Difficulty Level",
-+        options=["Easy", "Medium", "Hard"],
-+        index=1,
-+        help="Choose the complexity of questions and answers"
-+    )
-+    
-+    # Audio settings
-+    st.subheader("🔊 Audio Options")
-+    tts_language = st.selectbox(
-+        "Language",
-+        options=[
-+            ("English", "en"),
-+            ("Spanish", "es"), 
-+            ("French", "fr"),
-+            ("German", "de"),
-+            ("Italian", "it")
-+        ],
-+        format_func=lambda x: x[0],
-+        index=0,
-+        help="Select the language for text-to-speech"
-+    )
-+    
-+    speech_speed = st.selectbox(
-+        "Speech Speed",
-+        options=["Slow", "Normal", "Fast"],
-+        index=1,
-+        help="Choose how fast the audio should be spoken"
-+    )
-+    
-+    # Search settings
-+    st.subheader("🔍 Search Options")
-+    search_results_count = st.slider(
-+        "Search Results",
-+        min_value=3,
-+        max_value=10,
-+        value=5,
-+        help="Number of relevant passages to show in search results"
-+    )
-+    
-+    # Export settings
-+    st.subheader("📄 Export Options")
-+    export_format = st.multiselect(
-+        "Export Formats",
-+        options=["PDF", "Markdown", "Plain Text"],
-+        default=["PDF"],
-+        help="Choose which formats to export your study aids to"
-+    )
-+    
-+    # Compile all settings into a dictionary
-+    settings = {
-+        'summary': {
-+            'length': summary_length,
-+            'style': summary_style
-+        },
-+        'flashcards': {
-+            'count': num_flashcards,
-+            'difficulty': flashcard_difficulty
-+        },
-+        'audio': {
-+            'language': tts_language[1],  # Get the language code
-+            'language_name': tts_language[0],  # Get the display name
-+            'speed': speech_speed.lower()
-+        },
-+        'search': {
-+            'results_count': search_results_count
-+        },
-+        'export': {
-+            'formats': export_format
-+        }
-+    }
-+    
-+    return settings
-+
-+
-+def render_help_sidebar():
-+    """
-+    Render a help and tips section in the sidebar.
-+    """
-+    st.markdown("---")
-+    st.header("💡 Tips & Help")
-+    
-+    with st.expander("📚 How to Use"):
-+        st.markdown("""
-+        **Step 1:** Upload your study material (PDF or TXT)
-+        
-+        **Step 2:** Adjust settings in the sidebar
-+        
-+        **Step 3:** Use the tabs to:
-+        - Generate AI summaries
-+        - Create flashcards for review
-+        - Convert text to audio
-+        - Search through your content
-+        
-+        **Step 4:** Export your study aids when ready!
-+        """)
-+    
-+    with st.expander("🎯 Best Practices"):
-+        st.markdown("""
-+        - **Upload quality documents:** Clear, well-formatted PDFs work best
-+        - **Use descriptive filenames:** This helps with organization
-+        - **Start with summaries:** Get an overview before diving into flashcards
-+        - **Try audio mode:** Great for reviewing while commuting
-+        - **Use search frequently:** Find specific topics quickly
-+        """)
-+    
-+    with st.expander("⚡ Troubleshooting"):
-+        st.markdown("""
-+        - **Slow processing?** Try shorter documents or reduce flashcard count
-+        - **Poor text extraction?** Ensure your PDF has selectable text, not just images
-+        - **Audio not working?** Check your browser's audio settings
-+        - **Search not finding results?** Try different keywords or phrases
-+        """)
-+    
-+    # Contact/feedback section
-+    st.markdown("---")
-+    st.markdown("**Need Help?**")
-+    st.markdown("📧 Contact: [your-email@domain.com]")
-+    st.markdown("⭐ [Rate this app](your-feedback-link)")
-+
-+
-+def render_progress_sidebar(current_step: str = "upload"):
-+    """
-+    Render a progress indicator showing the current step in the workflow.
-+    
-+    Args:
-+        current_step (str): Current step ('upload', 'processing', 'results', 'export')
-+    """
-+    st.markdown("---")
-+    st.header("📊 Progress")
-+    
-+    steps = {
-+        'upload': '📂 Upload Document',
-+        'processing': '🤖 AI Processing', 
-+        'results': '📋 Review Results',
-+        'export': '💾 Export & Save'
-+    }
-+    
-+    step_order = ['upload', 'processing', 'results', 'export']
-+    current_index = step_order.index(current_step) if current_step in step_order else 0
-+    
-+    for i, (step_key, step_name) in enumerate(steps.items()):
-+        if i < current_index:
-+            st.success(f"✅ {step_name}")
-+        elif i == current_index:
-+            st.info(f"🔄 {step_name}")
-+        else:
-+            st.write(f"⏳ {step_name}")
-+
-+
-+# Example usage and testing
-+if __name__ == "__main__":
-+    st.set_page_config(page_title="Sidebar Test", layout="wide")
-+    
-+    with st.sidebar:
-+        uploaded_file, file_stats = render_file_upload_sidebar()
-+        settings = render_settings_sidebar()
-+        render_help_sidebar()
-+        render_progress_sidebar("processing")
-+    
-+    # Show results in main area for testing
-+    st.title("Sidebar Components Test")
-+    
-+    if uploaded_file:
-+        st.write("**File Info:**", file_stats)
-+    
-+    st.write("**Settings:**", settings)
-+
-EOF
-)
+import streamlit as st
+from typing import Dict, Any, Tuple, Optional
+from core.tts import get_supported_languages
+
+def render_file_upload_sidebar() -> Tuple[Optional[Any], Optional[Dict[str, Any]]]:
+    """
+    Render the file upload section in the sidebar with modern styling.
+    
+    Returns:
+        Tuple of (uploaded_file, file_stats)
+    """
+    st.markdown("""
+    <style>
+    .upload-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .upload-title {
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+    }
+    .file-stats {
+        background: rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        backdrop-filter: blur(10px);
+    }
+    .stat-item {
+        color: rgba(255,255,255,0.9);
+        font-size: 0.85rem;
+        margin: 0.2rem 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="upload-section">', unsafe_allow_html=True)
+    st.markdown('<div class="upload-title">📂 Upload Document</div>', unsafe_allow_html=True)
+    
+    uploaded_file = st.file_uploader(
+        "",
+        type=["pdf", "txt"],
+        help="Upload your study materials (PDF or TXT files)",
+        label_visibility="collapsed"
+    )
+    
+    file_stats = None
+    if uploaded_file:
+        # Calculate file stats
+        file_size = len(uploaded_file.getvalue())
+        if file_size < 1024:
+            size_str = f"{file_size} bytes"
+        elif file_size < 1024 * 1024:
+            size_str = f"{file_size / 1024:.1f} KB"
+        else:
+            size_str = f"{file_size / (1024 * 1024):.1f} MB"
+        
+        file_stats = {
+            'name': uploaded_file.name,
+            'size': file_size,
+            'size_str': size_str,
+            'type': uploaded_file.type
+        }
+        
+        # Display file stats with modern styling
+        st.markdown('<div class="file-stats">', unsafe_allow_html=True)
+        st.markdown(f'<div class="stat-item">📄 <strong>{uploaded_file.name}</strong></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stat-item">📊 {size_str}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stat-item">🔖 {uploaded_file.type}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    return uploaded_file, file_stats
+
+def render_settings_sidebar() -> Dict[str, Any]:
+    """
+    Render settings section with modern controls.
+    
+    Returns:
+        Dict containing all settings
+    """
+    st.markdown("""
+    <style>
+    .settings-section {
+        background: rgba(255,255,255,0.02);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .settings-title {
+        color: #e1e5e9;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .setting-group {
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        background: rgba(255,255,255,0.03);
+        border-radius: 8px;
+    }
+    .setting-label {
+        color: #b4bcc8;
+        font-size: 0.9rem;
+        font-weight: 500;
+        margin-bottom: 0.3rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="settings-section">', unsafe_allow_html=True)
+    st.markdown('<div class="settings-title">⚙️ Settings</div>', unsafe_allow_html=True)
+    
+    settings = {}
+    
+    # Summary Settings
+    st.markdown('<div class="setting-group">', unsafe_allow_html=True)
+    st.markdown('<div class="setting-label">📝 Summary</div>', unsafe_allow_html=True)
+    summary_length = st.select_slider(
+        "",
+        options=["short", "medium", "long"],
+        value="medium",
+        key="summary_length",
+        label_visibility="collapsed"
+    )
+    settings['summary'] = {'length': summary_length}
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Flashcard Settings
+    st.markdown('<div class="setting-group">', unsafe_allow_html=True)
+    st.markdown('<div class="setting-label">🃏 Flashcards</div>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        flashcard_count = st.number_input(
+            "Count",
+            min_value=5,
+            max_value=50,
+            value=15,
+            step=5,
+            key="flashcard_count",
+            label_visibility="collapsed"
+        )
+    
+    with col2:
+        flashcard_difficulty = st.selectbox(
+            "Difficulty",
+            ["easy", "medium", "hard"],
+            index=1,
+            key="flashcard_difficulty",
+            label_visibility="collapsed"
+        )
+    
+    settings['flashcards'] = {
+        'count': flashcard_count,
+        'difficulty': flashcard_difficulty
+    }
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Audio Settings
+    st.markdown('<div class="setting-group">', unsafe_allow_html=True)
+    st.markdown('<div class="setting-label">🔊 Audio</div>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        supported_languages = get_supported_languages()
+        audio_language = st.selectbox(
+            "Language",
+            options=list(supported_languages.keys()),
+            format_func=lambda x: supported_languages[x],
+            index=0,
+            key="audio_language",
+            label_visibility="collapsed"
+        )
+    
+    with col2:
+        audio_speed = st.selectbox(
+            "Speed",
+            ["normal", "slow"],
+            index=0,
+            key="audio_speed",
+            label_visibility="collapsed"
+        )
+    
+    settings['audio'] = {
+        'language': audio_language,
+        'speed': audio_speed
+    }
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Search Settings
+    st.markdown('<div class="setting-group">', unsafe_allow_html=True)
+    st.markdown('<div class="setting-label">🔍 Search</div>', unsafe_allow_html=True)
+    search_results = st.slider(
+        "",
+        min_value=3,
+        max_value=15,
+        value=5,
+        key="search_results",
+        label_visibility="collapsed",
+        help="Number of search results to display"
+    )
+    settings['search'] = {'max_results': search_results}
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    return settings
+
+def render_help_sidebar():
+    """Render help and tips section."""
+    st.markdown("""
+    <style>
+    .help-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1rem;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .help-title {
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .help-content {
+        color: rgba(255,255,255,0.9);
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+    .help-tip {
+        background: rgba(255,255,255,0.1);
+        border-radius: 6px;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        backdrop-filter: blur(10px);
+    }
+    .tip-icon {
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("💡 Quick Tips", expanded=False):
+        st.markdown("""
+        **Getting Started:**
+        1. Upload a PDF or TXT file
+        2. Generate a summary first
+        3. Create flashcards for active learning
+        4. Use audio for hands-free review
+        
+        **Best Practices:**
+        - Use clear, well-formatted documents
+        - Adjust settings based on content complexity
+        - Export your materials for offline study
+        - Regular review improves retention
+        
+        **File Support:**
+        - PDF files (text-based, not scanned images)
+        - Plain text files (.txt)
+        - Maximum recommended size: 10MB
+        """)
+    
+    # Quick stats if available
+    if 'storage_service' in st.session_state:
+        with st.expander("📊 Session Stats", expanded=False):
+            stats = st.session_state.storage_service.get_database_stats()
+            if stats:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Documents", stats.get('documents', 0))
+                    st.metric("Summaries", stats.get('summaries', 0))
+                with col2:
+                    st.metric("Flashcards", stats.get('flashcards', 0))
+                    st.metric("Sessions", stats.get('sessions', 0))
+
+def render_recent_documents_sidebar():
+    """Render recent documents section."""
+    if 'storage_service' not in st.session_state:
+        return
+    
+    with st.expander("📚 Recent Documents", expanded=False):
+        recent_docs = st.session_state.storage_service.get_recent_documents(limit=5)
+        
+        if recent_docs:
+            for doc in recent_docs:
+                st.markdown(f"""
+                **{doc['filename']}**
+                - Size: {doc.get('file_size', 0) / 1024:.1f} KB
+                - Uploaded: {doc['upload_date'][:10]}
+                """)
+        else:
+            st.info("No recent documents found.")
