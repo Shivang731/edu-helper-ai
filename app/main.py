@@ -1,98 +1,56 @@
 # app/main.py
+"""
+Study Aid Generator - Main Streamlit Application
+A comprehensive tool for PDF```ocessing, summarization, quiz generation,```d more.
+"""
 
-import streamlit as st
-from ui.sidebar import render_sidebar
-from ui.views import render_header, render_features, render_demo, render_testimonials, render_about, render_footer
-from core.fetcher import Fetcher
-from core.parser import Parser
-from core.summarizer import Summarizer
-from core.quizgen import QuizGenerator
-from core.tts import TextToSpeech
-from services.embeddings import SemanticSearcher
-from services.storage import StorageManager
-from services.exporter import Exporter
+import streamlit as```
+import sys
+import os
+from path``` import Path
 
-# Page config
-st.set_page_config(
-    page_title="Study Aid Generator",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    page_icon=":mortar_board:"
-)
+# Add project root to path```oject_root = Path(__file__).parent.parent
+sys.path.appen```tr(project_root))
 
-# Inject custom CSS for dark mode & purple gradients
-with open("ui/styles.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# Core imports
+from core import```from ui.sidebar import render```debar
+from ui.controls import render_controls
+from ui.```ws import render_main_content```om ui.styles import loa```ustom_css
+from services.storage```port initialize_database, get_user```ssion
 
-# Sidebar
-render_sidebar()
+def main():
+    """Main application entry point."""
+    try:
+        # Page configuration
+        st.set_page_```fig(
+            page_title="```dy Aid Generator",
+            page_icon="📚",
+            layout```ide",
+            initial_sidebar_state="expanded"```      )
+        
+        # Loa```ustom styles
+        load_custom_css()
+        
+        # Initialize database```      initialize_database()
+        
+        # Initialize session state```      if 'user_i```not in st.session_state:
+            st.session_state```er_id = "default_```r"
+        if 'uploaded_content```ot in st.session_state:
+            st.session_state```loaded_content = ""
+        if 'current```mmary' not in st.session_state```           st.session_state```rrent_summary = ""
+        if 'flash```ds' not in st.session_state:
+            st.session```ate.flashcards = []
+        if 'semantic```dex' not in st.session_state```           st.session_state.semantic_index = None```      
+        # Render UI```mponents
+        with st.sidebar:
+            render_```ebar()
+        
+        # Main content area
+        render```in_content()
+        
+    except Exception as e:
+        st.error(f"Application```ror: {str(e)}")
+        st.info```lease refresh the page or contact support if the issue persists.")
 
-# Header / Hero
-render_header()
-
-# File upload & processing
-uploaded_file = st.file_uploader("Upload PDF or TXT", type=["pdf", "txt"], key="uploader")
-if uploaded_file:
-    fetcher = Fetcher(uploaded_file)
-    raw_text = fetcher.extract_text()
-    parser = Parser(raw_text)
-    sections = parser.split_into_sections()
-
-    # Summarization
-    summarizer = Summarizer()
-    summary = summarizer.summarize(sections)
-    st.subheader("📄 Summary")
-    st.write(summary)
-
-    # Flashcards
-    quizgen = QuizGenerator()
-    flashcards = quizgen.generate_flashcards(summary)
-    st.subheader("❓ Flashcards")
-    for card in flashcards:
-        st.markdown(f"- **Q:** {card['question']}\n  **A:** {card['answer']}")
-
-    # Text-to-Speech
-    tts = TextToSpeech()
-    audio_bytes = tts.text_to_speech(summary)
-    st.subheader("🔊 Listen")
-    st.audio(audio_bytes, format="audio/mp3")
-
-    # Semantic Q&A
-    searcher = SemanticSearcher()
-    searcher.index_text(raw_text)
-    user_query = st.text_input("Ask a question about your document")
-    if user_query:
-        answer = searcher.query(user_query)
-        st.subheader("💡 Answer")
-        st.write(answer)
-
-    # Export options
-    exporter = Exporter(raw_text, summary, flashcards)
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("Export Markdown"):
-            exporter.to_markdown("output.md")
-            st.success("exported output.md")
-    with col2:
-        if st.button("Export Anki Deck"):
-            exporter.to_anki("flashcards.apkg")
-            st.success("exported flashcards.apkg")
-    with col3:
-        if st.button("Export PDF"):
-            exporter.to_pdf("study_notes.pdf")
-            st.success("exported study_notes.pdf")
-
-    # Save session
-    storage = StorageManager()
-    storage.save_session({
-        "file_name": uploaded_file.name,
-        "summary": summary,
-        "flashcards": flashcards
-    })
-
-# Static UI sections
-render_features()
-render_demo()
-render_testimonials()
-render_about()
-render_footer()
+if __name__ == "__main__":
+    main()
