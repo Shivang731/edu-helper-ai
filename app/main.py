@@ -1,55 +1,98 @@
-import sys
-import os
-import io
+# app/main.py
+
 import streamlit as st
-
-# Fix import path issue by adding project root to sys.path
-current_dir = os.path.dirname(__file__)
-project_root = os.path.abspath(os.path.join(current_dir, ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Now imports will work
-from core.fetcher import extract_text_from_pdf
-from core.summarizer import summarize_text
-from services.tts import text_to_speech_bytes
 from ui.sidebar import render_sidebar
-from ui.views import render_hero, render_features, render_demo, render_footer
+from ui.views import render_header, render_features, render_demo, render_testimonials, render_about, render_footer
+from core.fetcher import Fetcher
+from core.parser import Parser
+from core.summarizer import Summarizer
+from core.quizgen import QuizGenerator
+from core.tts import TextToSpeech
+from services.embeddings import SemanticSearcher
+from services.storage import StorageManager
+from services.exporter import Exporter
 
-st.set_page_config(page_title="Edu Helper AI", page_icon="📚", layout="wide")
+# Page config
+st.set_page_config(
+    page_title="Study Aid Generator",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    page_icon=":mortar_board:"
+)
 
-# Custom CSS
-st.markdown("""
-<style>
-body { background-color:#151929; color:#fff; }
-button { 
-    background:linear-gradient(90deg,#7046ec,#5b21b6); 
-    color:#fff; 
-    border:none;
-    border-radius:8px; 
-    padding:0.5rem 1.5rem;
-    cursor:pointer;
-}
-.stButton > button {
-    background:linear-gradient(90deg,#7046ec,#5b21b6) !important;
-    color:#fff !important;
-    border:none !important;
-    border-radius:8px !important;
-}
-</style>
-""", unsafe_allow_html=True)
+# Inject custom CSS for dark mode & purple gradients
+with open("ui/styles.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Layout
-render_hero()
+# Sidebar
+render_sidebar()
+
+# Header / Hero
+render_header()
+
+# File upload & processing
+uploaded_file = st.file_uploader("Upload PDF or TXT", type=["pdf", "txt"], key="uploader")
+if uploaded_file:
+    fetcher = Fetcher(uploaded_file)
+    raw_text = fetcher.extract_text()
+    parser = Parser(raw_text)
+    sections = parser.split_into_sections()
+
+    # Summarization
+    summarizer = Summarizer()
+    summary = summarizer.summarize(sections)
+    st.subheader("📄 Summary")
+    st.write(summary)
+
+    # Flashcards
+    quizgen = QuizGenerator()
+    flashcards = quizgen.generate_flashcards(summary)
+    st.subheader("❓ Flashcards")
+    for card in flashcards:
+        st.markdown(f"- **Q:** {card['question']}\n  **A:** {card['answer']}")
+
+    # Text-to-Speech
+    tts = TextToSpeech()
+    audio_bytes = tts.text_to_speech(summary)
+    st.subheader("🔊 Listen")
+    st.audio(audio_bytes, format="audio/mp3")
+
+    # Semantic Q&A
+    searcher = SemanticSearcher()
+    searcher.index_text(raw_text)
+    user_query = st.text_input("Ask a question about your document")
+    if user_query:
+        answer = searcher.query(user_query)
+        st.subheader("💡 Answer")
+        st.write(answer)
+
+    # Export options
+    exporter = Exporter(raw_text, summary, flashcards)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("Export Markdown"):
+            exporter.to_markdown("output.md")
+            st.success("exported output.md")
+    with col2:
+        if st.button("Export Anki Deck"):
+            exporter.to_anki("flashcards.apkg")
+            st.success("exported flashcards.apkg")
+    with col3:
+        if st.button("Export PDF"):
+            exporter.to_pdf("study_notes.pdf")
+            st.success("exported study_notes.pdf")
+
+    # Save session
+    storage = StorageManager()
+    storage.save_session({
+        "file_name": uploaded_file.name,
+        "summary": summary,
+        "flashcards": flashcards
+    })
+
+# Static UI sections
 render_features()
-
-def fetch_fn():
-    """Returns (file_buffer, text) tuple"""
-    file_uploader, text_area = render_sidebar()
-    if file_uploader:
-        return io.BytesIO(file_uploader.read()), ""
-    return None, text_area
-
-# Pass all three required functions to render_demo
-render_demo(fetch_fn, summarize_text, text_to_speech_bytes)
+render_demo()
+render_testimonials()
+render_about()
 render_footer()
