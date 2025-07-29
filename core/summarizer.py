@@ -1,47 +1,52 @@
-def summarize_text(text, max_length=150, min_length=50):
-    """Generate summary using simple extractive method or transformers if available."""
-    if not text or text.strip() == "":
+import re
+
+def summarize_text(text: str, max_length: int = 150, min_length: int = 50) -> str:
+    """
+    Generates an abstractive summary using transformers if available;
+    falls back to a simple extractive heuristic on error or missing library.
+    """
+    if not text or not text.strip():
         return ""
+
     try:
-        # Try using transformers if available
         from transformers import pipeline
         summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-        # Split text into chunks if too long
-        max_chunk_length = 1000
-        if len(text) > max_chunk_length:
-            chunks = [text[i:i+max_chunk_length] for i in range(0, len(text), max_chunk_length)]
-            summaries = []
-            for chunk in chunks[:3]:  # Limit to first 3 chunks
-                if len(chunk.strip()) > 100:
-                    result = summarizer(chunk, max_length=max_length//len(chunks), min_length=min_length//len(chunks))
-                    summaries.append(result[0]['summary_text'])
-            return " ".join(summaries)
-        else:
-            result = summarizer(text, max_length=max_length, min_length=min_length)
-            return result[0]['summary_text']
-    except ImportError:
-        # Fallback to simple extractive summarization
-        return _simple_extractive_summary(text)
-    except Exception as e:
-        print(f"Error in AI summarization: {str(e)}")
+
+        # Chunk text if too long
+        max_chunk = 1000
+        chunks = [text[i : i + max_chunk] for i in range(0, len(text), max_chunk)]
+        summaries = []
+        for chunk in chunks:
+            if len(chunk.strip()) < 50:
+                continue
+            res = summarizer(
+                chunk,
+                max_length=max_length,
+                min_length=min_length,
+                do_sample=False
+            )
+            summaries.append(res[0]["summary_text"])
+        return " ".join(summaries).strip()
+    except Exception:
+        # Fallback extractive summarization
         return _simple_extractive_summary(text)
 
-def _simple_extractive_summary(text):
-    """Simple extractive summarization as fallback."""
-    import re
-    # Split into sentences
-    sentences = re.split(r'[.!?]+', text)
-    sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
-    if not sentences:
-        return "Unable to generate summary from the provided text."
-    # Score sentences
-    scored_sentences = []
-    for i, sentence in enumerate(sentences):
-        position_score = 1.0 - (i / len(sentences)) * 0.5
-        length_score = min(len(sentence) / 100, 1.0)
-        total_score = position_score * length_score
-        scored_sentences.append((sentence, total_score))
-    # Sort by score and take top
-    scored_sentences.sort(key=lambda x: x[1], reverse=True)
-    summary_sentences = [s[0] for s in scored_sentences[:min(5, len(scored_sentences))]]
-    return ". ".join(summary_sentences) + "."
+def _simple_extractive_summary(text: str) -> str:
+    """
+    Simple heuristic: splits into sentences, scores by position & length,
+    and returns the top-scoring sentences.
+    """
+    sentences = re.split(r'(?<=[.!?]) +', text)
+    good = [s for s in sentences if len(s) > 30]
+    if not good:
+        return text[: min(150, len(text))].strip()
+
+    scored = []
+    total = len(good)
+    for idx, sent in enumerate(good):
+        pos_score = 1 - (idx / total) * 0.5
+        len_score = min(len(sent) / 100, 1)
+        scored.append((sent, pos_score * len_score))
+
+    top = sorted(scored, key=lambda x: x[1], reverse=True)[:5]
+    return " ".join(s for s, _ in top).strip()
